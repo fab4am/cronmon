@@ -48,7 +48,7 @@ foreach(Cronjob::all() as $cron) {
 			<td>$cron->host</td>
 			<td>$cron->command</td>
 			<td>
-			  <a href='".$webpath.basename(__FILE__)."?cronid=$cron->id' title='Cron options & execution log'><i class='icon-list'></i><i class='icon-wrench' title='Cron options'></i></a>
+			  <a href='".$webpath."crons.php?cronid=$cron->id' title='Cron options & execution log'><i class='icon-list'></i><i class='icon-wrench' title='Cron options'></i></a>
 			</td>
 		</tr>\n";
 		$messages = array();

@@ -17,7 +17,7 @@ The only minor changes that might be needed for cronmon to work, if not already 
 Features
 --------
  * registers crons with received e-mails, you don't have to add them manually in the first place
- * General and per-cron checks
+ * General, user-defined regexp, per-cron checks
  * write your own check plugins
  * write your own notification plugins
  * some useful checks are provided by default : 

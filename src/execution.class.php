@@ -65,12 +65,13 @@ class Execution {
 	}
 
 	function check($mark=true) {
-		$options = $this->cron->getOptions();
+		$options = $this->cron->getOptions(True, True);
 		$result = true;
 		$this->error = '';
 		if ($mark) $this->status = 1;
-		if (in_array('exec', array_keys($options))) {
-			foreach($options['exec'] as $check) {
+		foreach($options as $option) {
+			if ($option->check_type == "execution") {
+				$check = new check($option->check_type, $option->check_name, $option->param);
 				if (!$check->result($this)) {
 					$result = false;
 					$this->error .= $check->check->alert."<br />";
@@ -78,13 +79,6 @@ class Execution {
 				}
 			}
 		}
-		/*
-		if (in_array('proof', array_keys($options))) {
-			foreach($this->getProofs() as $proof) {
-				if (!$proof->check()) return false;
-			}
-		}
-		*/
 		if ($mark) {
 			$sql = "UPDATE execution SET status=$this->status, error='".mysql_real_escape_string($this->error)."' WHERE id=$this->id";
 			mysql_query($sql) or die($sql." - ".mysql_error());

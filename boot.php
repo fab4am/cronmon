@@ -8,6 +8,7 @@ include(dirname(__FILE__).'/src/execution.class.php');
 include(dirname(__FILE__).'/src/cronjob.class.php');
 include(dirname(__FILE__).'/src/check.class.php');
 include(dirname(__FILE__).'/src/notification.class.php');
+include(dirname(__FILE__).'/src/option.class.php');
 include(dirname(__FILE__).'/src/error.class.php');
 
 // mysql 

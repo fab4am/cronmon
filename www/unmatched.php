@@ -31,6 +31,7 @@ if (!empty($_GET['delete'])) {
 			$uproof->matchto($cron_id);
 		}
 	}
+	header("Location: /crons.php?cronid=".$cron_id);
 
 }
 

@@ -2,15 +2,17 @@
 
 class check {
 	var $name;
+	var $matching;
 	var $type;
 	var $check;
 	var $param;
 
-	function check($type, $name, $param=null) {
+	function check($type, $name, $param=null, $matching=null) {
 		if (!file_exists(__DIR__."/../checks/$type/$name.check.php")) return false;
 		$this->name = $name;
 		$this->type = $type;
 		$this->param = $param;
+		$this->matching = $matching;
 	}
 
 	function result($object) {

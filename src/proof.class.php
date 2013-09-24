@@ -49,16 +49,18 @@ class Proof {
 	}
 
 	function check($mark=true) {
-		$options = $this->exec->cron->getOptions();
-		if (!in_array('proof', array_keys($options))) return true;
+		$options = $this->exec->cron->getOptions(True, True);
 		$result = true;
 		$this->error = '';
 		if ($mark) $this->status = 1;
-		foreach($options['proof'] as $check) {
-			if (!$check->result($this)) {
-				$result = false;
-				$this->error .= $check->check->alert."<br />";
-				if ($mark) $this->status = 2;
+		foreach($options as $option) {
+			if ($option->check_type == "proof") {
+				$check = new check($option->check_type, $option->check_name, $option->param);
+				if (!$check->result($this)) {
+					$result = false;
+					$this->error .= $check->check->alert."<br />";
+					if ($mark) $this->status = 2;
+				}
 			}
 		}
 		if ($mark) {

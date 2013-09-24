@@ -7,7 +7,7 @@ $count = imap_num_msg($connection);
 for($msgno = 1; $msgno <= $count; $msgno++) {
 
     $headers = imap_headerinfo($connection, $msgno);
-    echo $msgno.". ".$headers->subject." ";
+    #echo $msgno.". ".$headers->subject." ";
 
     $command = preg_replace('/Cron <[^@>]+@[^>]+> (.+)/i', "$1", $headers->subject);
     $user = $headers->from[0]->mailbox;
@@ -19,7 +19,7 @@ for($msgno = 1; $msgno <= $count; $msgno++) {
     if ($cron_id = Cronjob::match($command, $user, $host)) {
 	    $cron = new Cronjob($cron_id);
 	    $cron->addExecution($date, $type, $content);
-	    echo " -> match cron $cron->id\n";
+	    #echo " -> match cron $cron->id\n";
     } else {
 	    $proof = new UProof();
 	    $proof->datetime = $date;
@@ -27,11 +27,11 @@ for($msgno = 1; $msgno <= $count; $msgno++) {
 	    $proof->fromuser = $user;
 	    $proof->fromhost = $host;
 	    $proof->senderIP = "";
-	    $proof->command = $command;
+	    $proof->command = CronJob::cleancommand($command);
 	    $proof->content = $content;
 
 	    $proof->save();
-	    echo " -> unmatched\n";
+	    #echo " -> unmatched\n";
     }
     imap_delete($connection, $msgno);
    

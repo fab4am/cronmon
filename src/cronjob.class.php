@@ -71,9 +71,18 @@ class Cronjob {
 	}
 
 	function delete() {
-		$sql = "DELETE FROM cronjob WHERE id = $this->id";
-		mysql_query($sql);
 
+		$sql = "DELETE FROM proof WHERE exec_id IN (SELECT id FROM execution WHERE cron_id = $this->id)";
+		mysql_query($sql) or die($sql." - ".mysql_error());
+
+		$sql = "DELETE FROM execution WHERE cron_id = $this->id";
+		mysql_query($sql) or die($sql." - ".mysql_error());
+		
+		$sql = "DELETE FROM cronjob WHERE id = $this->id";
+		mysql_query($sql) or die($sql." - ".mysql_error());
+		
+		$sql = "DELETE FROM check_options WHERE cron_id = $this->id";
+		mysql_query($sql) or die($sql." - ".mysql_error());
 	}
 
 	function addExecution($date, $type, $content) {
@@ -84,45 +93,37 @@ class Cronjob {
 		$exec->addProof($date, $type, $content);
 	}
 
-	function setOption($type, $name, $param=null) {
-		$sql = "REPLACE INTO check_options VALUES($this->id, '$type', '$name', '$param');";
-		mysql_query($sql) or die($sql." - ".mysql_error());
+	function setOption($type, $name, $param=null, $matching=null) {
+		$option = new Option();
+		$option->cron_id = $this->id;
+		$option->name = $name;
+		$option->type = $type;
+		$option->matching = $matching;
+		$option->param = $param;
+		$option->add();
 	}
 
-	function delOption($type, $name, $param=null) {
-		$sql = "DELETE FROM check_options WHERE cron_id=$this->id AND check_type='$type' AND check_name='$name' AND param='$param';";
-		mysql_query($sql)or die($sql." - ".mysql_error());
+	function delOption($id) {
+		$option = new Option($id);
+		if ($option->cron_id == $this->id) $optionremove();
 	}
 
-	function getOptions($mode=1) { // 1 = cron options + default options, 2 = cron options only, 3 = default options only
-		if ($mode == 1) $sql = "SELECT check_type, check_name, param FROM check_options WHERE cron_id=$this->id OR cron_id=0;";
-		elseif ($mode==2) $sql = "SELECT check_type, check_name, param FROM check_options WHERE cron_id=$this->id;";
-		elseif ($mode==3) $sql = "SELECT check_type, check_name, param FROM check_options WHERE cron_id=0;";
-		$result = mysql_query($sql) or die($sql." - ".mysql_error());
-		$this->options = array();
-		while ($row = mysql_fetch_object($result)) {
-			$this->options[$row->check_type][] = new check($row->check_type, $row->check_name, $row->param);
-		}
+	function getOptions($withglobal=True, $withmatching=False) { 
+		$this->options = option::all($this->id, $withglobal, $withmatching);
 		return $this->options;
 	}
 
 	function check() {
-		$options = $this->getOptions();
-		if (in_array('cron', array_keys($options))) {
-			foreach($options['cron'] as $check) {
+		$options = $this->getOptions(True, True);
+		foreach($options as $option) {
+			if ($option->check_type == "cron") {
+				$check = new check($option->check_type, $option->check_name, $option->param);
 				if (!$check->result($this)) {
 					$this->error .= $check->check->alert;
 					return false;
 				}
 			}
 		}
-		/*
-		if ((in_array('exec', array_keys($options)))||(in_array('proof', array_keys($options)))) {
-			foreach($this->getExecutions() as $proof) {
-				if (!$proof->check()) return false;
-			}
-		}
-		*/
 		return true;
 	}
 
@@ -144,13 +145,14 @@ class Cronjob {
 			$row = mysql_fetch_object($result);
 			$success = $row->nb;
 
+			if ($total == 0) return 0;
 			return round($success/$total)*100;
 		}
 	}
 
 	public static function match($command, $user, $host) {
 		$sql = "SELECT id FROM cronjob
-			WHERE command = '$command'
+			WHERE command = '".Cronjob::cleancommand($command)."'
 			AND user = '$user'
 			AND host = '$host';
 		";
@@ -159,6 +161,11 @@ class Cronjob {
 			$cron_id = mysql_fetch_object($result);
 			return $cron_id->id;
 		} else return false;
+	}
+
+	public static function cleancommand($command) {
+		$command = str_replace(" (failed)", "", $command);
+		return $command;
 	}
 
 	public static function all() {

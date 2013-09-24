@@ -3,6 +3,7 @@
 include('boot.php');
 
 foreach(Cronjob::all() as $cron) {
+	#echo "$cron->id : $cron->command";
 	foreach($cron->getExecutions(null, null, 'all', 0) as $exec) {
 		foreach($exec->getProofs('0') as $proof) {
 			#echo "proof $proof->id\n";

@@ -3,34 +3,24 @@ include('header.php');
 
 	$cron = new Cronjob(0);
 	if ((!empty($_POST))&&($_POST['submitted'] == 'checks')) {
-		$checks = check::getAllOptions();
-		foreach($checks as $type => $typechecks) {
-			foreach ($typechecks as $name => $check) {
-				if ($check->withparam) {
-					if ((in_array($type."_".$name, array_keys($_POST))) && ($_POST[$type."_".$name] == "on")&&in_array($type."_".$name."_param", array_keys($_POST))) 
-					        $cron->setOption($type, $name, $_POST[$type."_".$name."_param"]);
-					elseif (in_array($type."_".$name."_param", array_keys($_POST))) $cron->delOption($type, $name, $_POST[$type."_".$name."_param"]);
-
-					$continue=True;
-					$count = 1;
-					while ($continue) {
-						if ((in_array($type."_".$name."_".$count, array_keys($_POST))) && ($_POST[$type."_".$name."_".$count] == "on") && in_array($type."_".$name."_".$count."_param", array_keys($_POST))) 
-							$cron->setOption($type, $name, $_POST[$type."_".$name."_".$count."_param"]);
-						elseif (in_array($type."_".$name."_".$count."_param", array_keys($_POST))) 
-							$cron->delOption($type, $name, $_POST[$type."_".$name."_".$count."_param"]);
-						else $continue=false;
-						$count++;
-						#if ($count>20) $continue=false;
-					}
-
-				} else {
-					if ((in_array($type."_".$name, array_keys($_POST))) && ($_POST[$type."_".$name] == "on")) { 
-						$cron->setOption($type, $name);
-					} else { 
-						$cron->delOption($type, $name);
-					}
-				}
+		$options = option::all(False, False, True);
+		foreach($options as $option) {
+			if ( (!in_array($option->id, array_keys($_POST['modif']))) || (!in_array('onoff', array_keys($_POST['modif'][$option->id]))) ) {
+				$option->remove();
+				continue;
 			}
+			if (in_array('matching', array_keys($_POST['modif'][$option->id]))) $option->matching = $_POST['modif'][$option->id]['matching'];
+			if (in_array('param', array_keys($_POST['modif'][$option->id]))) $option->param = $_POST['modif'][$option->id]['param'];
+			$option->save();
+		}
+		foreach($_POST['new'] as $newoption) {
+			if (!in_array('onoff', array_keys($newoption))) continue;
+			$option = new Option();
+			if (in_array('matching', array_keys($newoption))) $option->matching = $newoption['matching'];
+			if (in_array('param', array_keys($newoption))) $option->param = $newoption['param'];
+			$option->check_type = $newoption['type'];
+			$option->check_name = $newoption['name'];
+			$option->add();
 		}
 	}
 
@@ -53,47 +43,110 @@ include('header.php');
 
 <h2>Options</h2>
 
-<h3>Default checks</h3>
 <form method='POST' class='form-inline' name='defaultchecks' action='<?=$_SERVER['PHP_SELF']?>'>
-<p>These checks will be applied to every single cron.</p>
+<div class='row-fluid'>
+<div class='span6'>
+
+<h3>Default checks</h3>
+<p>These checks will be applied on every single cron.</p>
 <h4>Notify on : </h4>
 <?php
-	$getname = function($check) {
-		return $check->name;
-	};
-
-	$cron->getOptions();
+	$options = option::all();
 	$checks = check::getAllOptions();
-	foreach($checks as $type => $typechecks) {
-		echo "<h5>$type</h5>";
-		foreach ($typechecks as $name => $check) {
-			if (!$check->withparam) {
-				if ((in_array($type, array_keys($cron->options))) && (in_array($name, array_map($getname, $cron->options[$type])))) $checked = " checked='checked' ";
-				else $checked = "";
-				echo "<label class='checkbox'><input type='checkbox' name='".$type."_".$name."' $checked> $check->desc</label><br />";
-			} else {
-				$count=1;
-				foreach($cron->options as $optiontypes) {
-					foreach($optiontypes as $optname => $option) {
-						if ($option->name == $name) {
-							echo "<label class='checkbox'><input type='checkbox' name='".$type."_".$name."_$count' checked='checked'> $check->desc :&nbsp;</label>";
-							echo "<input type='text' name='".$type."_".$name."_".$count."_param' value='$option->param' disabled/>";
-							echo "<input type='hidden' name='".$type."_".$name."_".$count."_param' value='$option->param' /><br />";
-							$count++;
-						}
+	$count=1;
+	foreach($checks as $check_type => $check_type_data) {
+		echo "<h5>$check_type</h5>";
+		foreach ($check_type_data as $check_name => $check) {
+			$done = false;
+			foreach($options as $option) {
+				if (($option->check_name == $check_name) && ($option->check_type == $check_type)) {
+					if ($check->withparam) { 
+						echo "<label class='checkbox'><input type='checkbox' name='modif[$option->id][onoff]' checked='checked'> $check->desc :&nbsp;</label>";
+						echo "<input type='text' name='modif[$option->id][param]' value='$option->param' />";
+					} else {
+						$checked = " checked='checked'";
+						echo "<label class='checkbox'><input type='checkbox' name='modif[$option->id][onoff]' $checked> $check->desc</label><br />";
 					}
+					$done = true;
 				}
-				echo "<label class='checkbox'><input type='checkbox' name='".$type."_".$name."'> $check->desc :&nbsp;</label>";
-				echo "<input type='text' name='".$type."_".$name."_param' /><br />";
 			}
+			if ($check->withparam) { 
+				echo "<label class='checkbox'><input type='checkbox' name='new[$count][onoff]'> $check->desc :&nbsp;</label>";
+                                $function = new ReflectionMethod(get_class($check), 'check');
+                                $params = $function->getParameters();
+                                foreach($params as $p){
+                                        if (($p->name == 'param')&&($p->isOptional())) $default = json_encode($p->getDefaultValue());
+                                }
+				echo "<input type='text' name='new[$count][param]' value='$default'/><br />";
+                                $default = '';
+				echo "<input type='hidden' name='new[$count][type]' value='$check_type' />";
+				echo "<input type='hidden' name='new[$count][name]' value='$check_name' />";
+			} elseif (!$done) {
+				echo "<label class='checkbox'><input type='checkbox' name='new[$count][onoff]'> $check->desc</label><br />";
+				echo "<input type='hidden' name='new[$count][type]' value='$check_type' />";
+				echo "<input type='hidden' name='new[$count][name]' value='$check_name' />";
+			}
+			$count++;
+			echo "<hr />";
 		}
 	}
 ?>
-    <br />
+
+</div>
+<div class='span6'>
+
+<h3>Regexp matching checks</h3>
+<p>These checks will be applied on crons whose title is matched by defined regexp:</p>
+<h4>Notify on : </h4>
+<?php
+	$options2 = option::all(False, False, True);
+	foreach($checks as $check_type => $check_type_data) {
+		echo "<h5>$check_type</h5>";
+		foreach ($check_type_data as $check_name => $check) {
+			foreach($options2 as $id => $option) {
+				if (($option->check_name == $check_name) && ($option->check_type == $check_type)) {
+					if (isset($option->matching) && !empty($option->matching)) {
+						echo "For crons with subject matching : <input type='text' name='modif[$option->id][matching]' value='$option->matching' /><br />";
+						if ($check->withparam) { 
+							echo "<label class='checkbox'><input type='checkbox' name='modif[$option->id][onoff]' checked='checked'> $check->desc :&nbsp;</label>";
+							echo "<input type='text' name='modif[$option->id][param]' value='$option->param' /><br /><br />";
+							$count++;
+						} else {
+							$checked = " checked='checked'";
+							echo "<label class='checkbox'><input type='checkbox' name='modif[$option->id][onoff]' $checked> $check->desc</label><br /><br />";
+						}
+					}
+				}
+			}
+			if ($check->withparam) { 
+				echo "For crons with subject matching : <input type='text' name='new[$count][matching]'   /><br />";
+				echo "<label class='checkbox'><input type='checkbox' name='new[$count][onoff]'> $check->desc :&nbsp;</label>";
+                                $function = new ReflectionMethod(get_class($check), 'check');
+                                $params = $function->getParameters();
+                                foreach($params as $p){
+                                        if (($p->name == 'param')&&($p->isOptional())) $default = json_encode($p->getDefaultValue());
+                                }
+				echo "<input type='text' name='new[$count][param]' value='$default'/><br />";
+                                $default = '';
+				echo "<input type='hidden' name='new[$count][type]' value='$check_type' />";
+				echo "<input type='hidden' name='new[$count][name]' value='$check_name' />";
+			} elseif (!$done) {
+				echo "For crons with subject matching : <input type='text' name='new[$count][matching]'   /><br />";
+				echo "<label class='checkbox'><input type='checkbox' name='new[$count][onoff]'> $check->desc</label><br />";
+				echo "<input type='hidden' name='new[$count][type]' value='$check_type' />";
+				echo "<input type='hidden' name='new[$count][name]' value='$check_name' />";
+			}
+			$count++;
+			echo "<hr />";
+		}
+	}
+?>
+
+</div>
+</div>
     <input type='hidden' name='submitted' value='checks' />
     <button class="btn btn-primary"><i class="icon-white icon-ok"></i> Save changes</button>
   </form>
-
 <hr />
 
 <h3>Notifications</h3>
